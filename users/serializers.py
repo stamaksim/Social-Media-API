@@ -1,6 +1,9 @@
 from django.contrib.auth import get_user_model, authenticate
 from rest_framework import serializers
 from django.utils.translation import gettext as _
+from rest_framework_simplejwt.tokens import RefreshToken
+
+CustomerUser = get_user_model()
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -52,3 +55,29 @@ class AuthTokenSerializer(serializers.Serializer):
 
         attrs["user"] = user
         return attrs
+
+
+class FollowUnfollowSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    type = serializers.ChoiceField(
+        choices=[("follow", "Follow"), ("unfollow", "Unfollow")]
+    )
+
+    def validate_id(self, value):
+        if not CustomerUser.objects.filter(id=value).exists():
+            raise serializers.ValidationError("User with this ID does not exist.")
+        return value
+
+
+class LogoutSerializer(serializers.Serializer):
+    refresh = serializers.CharField()
+
+    def validate(self, attrs):
+        self.token = attrs["refresh"]
+        return attrs
+
+    def save(self, **kwargs):
+        try:
+            RefreshToken(self.token).blacklist()
+        except Exception as e:
+            self.fail("invalid token")
