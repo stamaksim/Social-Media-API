@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "debug_toolbar",
     "social_api.apps.SocialApiConfig",
     "users.apps.UsersConfig",
+    "django_filters",
 ]
 
 MIDDLEWARE = [
