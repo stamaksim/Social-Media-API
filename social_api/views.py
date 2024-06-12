@@ -5,8 +5,9 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
-from social_api.models import Post, Like
-from social_api.serializers import PostSerializer, LikeSerializer
+from social_api.models import Post, Like, Comment
+from social_api.serializers import PostSerializer, LikeSerializer, CommentSerializer
+from .permissions import IsOwnerReadOnly
 
 
 class PostViewSet(
@@ -59,3 +60,18 @@ class LikedPost(generics.ListAPIView):
         likes = Like.objects.filter(liker=self.request.user)
         liked_post = [like.post for like in likes]
         return liked_post
+
+
+class CommentList(generics.ListCreateAPIView):
+    queryset = Comment.objects.all()
+    serializer_class = CommentSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
+
+
+class CommentDetail(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Comment.objects.all()
+    serializer_class = CommentSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerReadOnly]

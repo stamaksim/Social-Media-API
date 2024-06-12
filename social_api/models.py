@@ -36,3 +36,24 @@ class Like(models.Model):
     class Meta:
         unique_together = ("liker", "post")
         ordering = ["-created_at"]
+
+
+class Comment(models.Model):
+    created = models.DateTimeField(auto_now_add=True)
+    owner = models.ForeignKey(
+        CustomerUser,
+        on_delete=models.CASCADE,
+        related_name="comments",
+    )
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="comments")
+    text = models.TextField()
+    parent = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.CASCADE, related_name="replies"
+    )
+
+    class Meta:
+        ordering = ["created"]
+        indexes = [models.Index(fields=["created"])]
+
+    def __str__(self):
+        return f"Comment by {self.owner} on {self.post}"
