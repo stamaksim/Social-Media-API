@@ -8,6 +8,7 @@ from rest_framework.settings import api_settings
 from rest_framework.views import APIView
 from .serializers import FollowUnfollowSerializer, UserSerializer, LogoutSerializer
 from django.http import Http404
+from social_api.permissions import IsOwnerReadOnly
 
 CustomerUser = get_user_model()
 
@@ -120,14 +121,14 @@ class UsersList(generics.ListAPIView):
         return queryset
 
 
-class UserProfileView(generics.RetrieveAPIView):
+class UserProfileView(generics.RetrieveUpdateDestroyAPIView):
     queryset = CustomerUser.objects.all()
     serializer_class = UserSerializer
     lookup_field = "email"
 
 
 class LogoutView(APIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, IsOwnerReadOnly)
 
     def post(self, request):
         serializer = LogoutSerializer(data=request.data)
