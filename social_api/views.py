@@ -1,13 +1,21 @@
-from django.shortcuts import render
+from datetime import datetime, timedelta
+from django.db.models import Q
+from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import mixins, filters, generics, permissions, status
+from rest_framework import mixins, filters, generics, permissions, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from social_api.models import Post, Like, Comment
-from social_api.serializers import PostSerializer, LikeSerializer, CommentSerializer
+from social_api.serializers import (
+    PostSerializer,
+    LikeSerializer,
+    CommentSerializer,
+)
 from .permissions import IsOwnerReadOnly
+from .tasks import create_scheduled_post
 
 
 class PostViewSet(
@@ -15,19 +23,34 @@ class PostViewSet(
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
     mixins.DestroyModelMixin,
-    GenericViewSet,
+    viewsets.GenericViewSet,
 ):
-
+    queryset = Post.objects.all().order_by("-created_at")
     serializer_class = PostSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filter_fields = ["hashtags", "author__email"]
     search_fields = ["content", "hashtags"]
     permission_classes = [IsAuthenticated]
 
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
+
     def get_queryset(self):
         user = self.request.user
         following_users = user.following.all()
-        return Post.objects.filter(author__in=[user] + list(following_users))
+        return Post.objects.filter(
+            Q(author__in=following_users) | Q(author=user)
+        ).order_by("-created_at")
+
+    @action(detail=False, methods=["post"])
+    def schedule_post_creation(self, request):
+        content = request.data.get("content")
+        hashtags = request.data.get("hashtags", "")
+        eta = datetime.utcnow() + timedelta(
+            minutes=int(request.data.get("delay_minutes", 1))
+        )
+        create_scheduled_post.apply_async((content, request.user.id, hashtags), eta=eta)
+        return Response({"status": "Post creation scheduled"})
 
 
 class LikeCreate(generics.CreateAPIView, mixins.DestroyModelMixin):

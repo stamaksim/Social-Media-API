@@ -22,7 +22,7 @@ class Post(models.Model):
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     image = models.ImageField(upload_to=profile_image_file_path, blank=True, null=True)
-    hashtags = models.CharField(max_length=255, blank=True)
+    hashtags = models.CharField(max_length=255, blank=True, null=True)
 
     def __str__(self):
         return self.content[:30]

@@ -1,16 +1,18 @@
 from rest_framework import serializers
 from social_api.models import Post, Like, Comment
+from users.serializers import UserSerializer
 
 
 class PostSerializer(serializers.ModelSerializer):
+    author = serializers.ReadOnlyField(source="author.id")
 
     class Meta:
         model = Post
-        fields = ("id", "author", "content", "created_at", "image", "hashtags")
+        fields = ("id", "content", "author", "created_at", "image", "hashtags")
 
 
 class LikeSerializer(serializers.ModelSerializer):
-    liker = serializers.ReadOnlyField(source="liker.username")
+    liker = serializers.ReadOnlyField(source="liker.id")
 
     class Meta:
         model = Like

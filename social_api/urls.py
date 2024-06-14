@@ -12,7 +12,7 @@ router = routers.DefaultRouter()
 app_name = "social_api"
 
 
-router.register("post", PostViewSet, basename="post")
+router.register("posts", PostViewSet, basename="post")
 
 urlpatterns = [
     path("", include(router.urls)),
