@@ -1,13 +1,15 @@
 from datetime import datetime, timedelta
 from django.db.models import Q
-from rest_framework.response import Response
+from drf_spectacular import openapi
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, filters, generics, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.viewsets import GenericViewSet
+
 from social_api.models import Post, Like, Comment
 from social_api.serializers import (
     PostSerializer,
@@ -42,8 +44,31 @@ class PostViewSet(
             Q(author__in=following_users) | Q(author=user)
         ).order_by("-created_at")
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="author_email",
+                type=openapi.OpenApiTypes.STR,
+                description="Filter posts by author's email.",
+            ),
+            OpenApiParameter(
+                name="hashtags",
+                type=openapi.OpenApiTypes.STR,
+                description="Filter posts by hashtags.",
+            ),
+        ]
+    )
+    def list(self, request, *args, **kwargs) -> Response:
+        """
+        Get a list of posts.
+        """
+        return super().list(request, *args, **kwargs)
+
     @action(detail=False, methods=["post"])
     def schedule_post_creation(self, request):
+        """
+        Schedule a post creation.
+        """
         content = request.data.get("content")
         hashtags = request.data.get("hashtags", "")
         eta = datetime.utcnow() + timedelta(
@@ -53,7 +78,7 @@ class PostViewSet(
         return Response({"status": "Post creation scheduled"})
 
 
-class LikeCreate(generics.CreateAPIView, mixins.DestroyModelMixin):
+class LikeAPIView(generics.CreateAPIView, mixins.DestroyModelMixin):
     serializer_class = LikeSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -75,14 +100,59 @@ class LikeCreate(generics.CreateAPIView, mixins.DestroyModelMixin):
             return Response(status=status.HTTP_204_NO_CONTENT)
         raise ValidationError("You have never liked this post")
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="user",
+                type=openapi.OpenApiTypes.STR,
+                description="Filter likes by user.",
+            ),
+            OpenApiParameter(
+                name="post",
+                type=openapi.OpenApiTypes.STR,
+                description="Filter likes by post.",
+            ),
+        ]
+    )
+    def list(self, request, *args, **kwargs) -> Response:
+        """
+        Get a list of likes.
+        """
+        return super().list(request, *args, **kwargs)
+
 
 class LikedPost(generics.ListAPIView):
     serializer_class = PostSerializer
 
     def get_queryset(self):
         likes = Like.objects.filter(liker=self.request.user)
-        liked_post = [like.post for like in likes]
-        return liked_post
+        liked_posts = [like.post for like in likes]
+        return liked_posts
+
+
+class LikerAPIView(generics.CreateAPIView, mixins.DestroyModelMixin):
+    serializer_class = LikeSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        post = Post.objects.get(pk=self.kwargs["pk"])
+        return Like.objects.filter(liker=user, post=post)
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="liker",
+                type=openapi.OpenApiTypes.STR,
+                description="Filter likes by liker.",
+            ),
+        ]
+    )
+    def list(self, request, *args, **kwargs) -> Response:
+        """
+        Get a list of likers.
+        """
+        return super().list(request, *args, **kwargs)
 
 
 class CommentList(generics.ListCreateAPIView):
